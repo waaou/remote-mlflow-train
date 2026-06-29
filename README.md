@@ -45,3 +45,22 @@ You can then simply run `source secrets.sh` to export all your environmnet varia
 
 Happy coding! 👩‍💻
 
+
+
+##
+```
+[ec2-user@ip-172-31-14-86 ~]$ mlflow run . --build-image --experiment-name mlflow-demo
+2026/06/29 14:11:07 INFO mlflow.projects.docker: === Building docker image californian_housing_market:2b6c086 ===
+2026/06/29 14:12:52 INFO mlflow.projects.utils: === Created directory /tmp/tmpyqk2uxez for downloading remote URIs passed to arguments of type 'path' ===
+
+bash: line 1: -e: command not found
+"docker run" requires at least 1 argument.
+See 'docker run --help'.
+
+Usage:  docker run [OPTIONS] IMAGE [COMMAND] [ARG...]
+
+Create and run a new container from an image
+🏃 View run unleashed-mink-754 at: https://franckidda-my-mlflow-tracker.hf.space/#/experiments/3/runs/3582836ebea942aaadfd12453e3248c4
+🧪 View experiment at: https://franckidda-my-mlflow-tracker.hf.space/#/experiments/3
+2026/06/29 14:12:58 ERROR mlflow.cli: === Run (ID '3582836ebea942aaadfd12453e3248c4') failed ===
+```
