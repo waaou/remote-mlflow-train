@@ -1,104 +1,135 @@
 import argparse
-import pandas as pd
 import time
+import os
+
 import mlflow
-from mlflow.models.signature import infer_signature
-from sklearn.model_selection import train_test_split 
-from sklearn.preprocessing import  StandardScaler, FunctionTransformer, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+import pandas as pd
+# from mlflow import MlflowClient
+from mlflow.models import infer_signature
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+
+# Tracking server
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
 
 
 if __name__ == "__main__":
-
-    ### MLFLOW Experiment setup
-    experiment_name="appointment_cancellation_detector"
-    mlflow.set_experiment(experiment_name)
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-
-    client = mlflow.tracking.MlflowClient()
-    run = client.create_run(experiment.experiment_id)
-
-    print("training model...")
-    
-    # Time execution
-    start_time = time.time()
-
-    # Call mlflow autolog
-    mlflow.sklearn.autolog(log_models=False) # We won't log models right away
-
-    # Parse arguments given in shell script
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_estimators")
-    parser.add_argument("--min_samples_split")
+    parser.add_argument("--n_estimators", type=int, default=100)
+    parser.add_argument("--min_samples_split", type=int, default=2)
+    parser.add_argument("--test_size", type=float, default=0.2)
+    parser.add_argument("--random_state", type=int, default=42)
     args = parser.parse_args()
 
-    # Import dataset
-    df = pd.read_csv("https://full-stack-assets.s3.eu-west-3.amazonaws.com/Deployment/doctolib_simplified_dataset_01.csv")
+    experiment_name = "california_housing_regressor_2" # fixé dans le terminal au moment du run
+    registered_model_name = "california_housing_regressor"
+    alias_name = "challenger"
 
-    # X, y split 
-    X = df.iloc[:, 3:-1]
-    y = df.iloc[:, -1].apply(lambda x: 0 if x=="No" else 1)
+    mlflow.set_experiment(experiment_name) # fixé dans le terminal au moment du run
+    # Get our experiment info
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    # client = MlflowClient()
 
-    # Train / test split 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+    print("Training model...")
+    start_time = time.time()
 
-    # Preprocessing 
-    def date_processing(df):
-        df = df.copy()
+    # Keep autolog basic, but log model manually
+    mlflow.sklearn.autolog()
 
-        ## Transform datetime into a number
-        df["ScheduledDay"] = pd.to_datetime(df["ScheduledDay"], yearfirst=True, infer_datetime_format=True)
-        df["AppointmentDay"] = pd.to_datetime(df["AppointmentDay"], yearfirst=True, infer_datetime_format=True)
+    # ------------------------------------------------------------------
+    # Dataset: California Housing
+    # ------------------------------------------------------------------
+    df = pd.read_csv(
+        "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
+    )
 
-        ## Get the difference between scheduled day and appointment
-        df["time_difference_between_scheduled_and_appointment"] = (df["AppointmentDay"] - df["ScheduledDay"]).dt.days
+    X = df.iloc[:, :-1]
+    y = df.iloc[:, -1]
 
-        ## Remove redundant info 
-        df = df.drop(["ScheduledDay", "AppointmentDay"], axis=1)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=args.test_size,
+        random_state=args.random_state,
+    )
 
-        return df 
-
-    date_preprocessor = FunctionTransformer(date_processing)
-
-    # Preprocessing 
-    categorical_features = ["Gender", "Neighbourhood"] # Select all the columns containing strings
-    categorical_transformer = OneHotEncoder(drop='first', handle_unknown='error', sparse=False)
-
-    numerical_feature_mask = ~X_train.columns.isin(["Gender", "Neighbourhood", "ScheduledDay","AppointmentDay"]) # Select all the columns containing anything else than strings
-    numerical_features = X_train.columns[numerical_feature_mask]
-    numerical_transformer = StandardScaler()
-
-    feature_preprocessor = ColumnTransformer(
-        transformers=[
-            ("categorical_transformer", categorical_transformer, categorical_features),
-            ("numerical_transformer", numerical_transformer, numerical_features)
+    # ------------------------------------------------------------------
+    # Model pipeline
+    # ------------------------------------------------------------------
+    model = Pipeline(
+        steps=[
+            ("scaler", StandardScaler()),
+            (
+                "regressor",
+                RandomForestRegressor(
+                    n_estimators=args.n_estimators,
+                    min_samples_split=args.min_samples_split,
+                    random_state=args.random_state,
+                ),
+            ),
         ]
     )
 
-    # Pipeline 
-    n_estimators = int(args.n_estimators)
-    min_samples_split=int(args.min_samples_split)
-
-    model = Pipeline(steps=[
-        ("Dates_preprocessing", date_preprocessor),
-        ('features_preprocessing', feature_preprocessor),
-        ("Regressor",RandomForestClassifier(n_estimators=n_estimators, min_samples_split=min_samples_split))
-    ])
-
-    # Log experiment to MLFlow
-    with mlflow.start_run(run_id = run.info.run_id) as run:
+    with mlflow.start_run(experiment_id = experiment.experiment_id) as run:
         model.fit(X_train, y_train)
-        predictions = model.predict(X_train)
 
-        # Log model seperately to have more flexibility on setup 
-        mlflow.sklearn.log_model(
-            sk_model=model,
-            artifact_path="appointment_cancellation_detector",
-            registered_model_name="appointment_cancellation_detector_RF",
-            signature=infer_signature(X_train, predictions)
-        )
-        
+        predictions = model.predict(X_test)
+
+        rmse = mean_squared_error(y_test, predictions) ** 0.5
+        r2 = r2_score(y_test, predictions)
+
+        # mlflow.log_metric("test_rmse", rmse)
+        # mlflow.log_metric("test_r2", r2)
+        # mlflow.log_param("dataset", "california_housing")
+
+        signature = infer_signature(X_train, predictions)
+        input_example = X_train.head(5)
+
+        # # MLflow 3.x: prefer `name=` instead of deprecated `artifact_path=`
+        # model_info = mlflow.sklearn.log_model(
+        #     sk_model=model,
+        #     artifact_path="model",
+        #     signature=signature,
+        #     input_example=input_example,
+        # )
+
+        # model_version = model_info.registered_model_version
+        # print(f"[INFO] Model logged as version {model_version}")
+
+        # client.set_registered_model_alias(
+        #     name=registered_model_name,
+        #     alias=alias_name,
+        #     version=model_version,
+        # )
+        # print(f"[INFO] Alias '{alias_name}' now points to version {model_version}")
+
+        # # Optional: handy tags for the registry/UI
+        # client.set_model_version_tag(
+        #     name=registered_model_name,
+        #     version=model_version,
+        #     key="dataset",
+        #     value="california_housing",
+        # )
+        # client.set_model_version_tag(
+        #     name=registered_model_name,
+        #     version=model_version,
+        #     key="metric:test_rmse",
+        #     value=f"{rmse:.4f}",
+        # )
+        # client.set_model_version_tag(
+        #     name=registered_model_name,
+        #     version=model_version,
+        #     key="metric:test_r2",
+        #     value=f"{r2:.4f}",
+        # )
+
+        print(f"[INFO] Run ID: {run.info.run_id}")
+        print(f"[INFO] Test RMSE: {rmse:.4f}")
+        print(f"[INFO] Test R2: {r2:.4f}")
+
     print("...Done!")
-    print(f"---Total training time: {time.time()-start_time}")
+    print(f"--- Total training time: {time.time() - start_time:.2f} seconds")
