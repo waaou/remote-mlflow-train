@@ -82,9 +82,9 @@ if __name__ == "__main__":
         rmse = mean_squared_error(y_test, predictions) ** 0.5
         r2 = r2_score(y_test, predictions)
 
-        # mlflow.log_metric("test_rmse", rmse)
-        # mlflow.log_metric("test_r2", r2)
-        # mlflow.log_param("dataset", "california_housing")
+        mlflow.log_metric("test_rmse", rmse)
+        mlflow.log_metric("test_r2", r2)
+        mlflow.log_param("dataset", "california_housing")
 
         signature = infer_signature(X_train, predictions)
         input_example = X_train.head(5)

@@ -1,9 +1,9 @@
 # Name of the experiment (and the new docker image that MLFlow will create when running the file)
-name: californian_housing_market 
+name: test-build-from-mlflow
 
 docker_env:
   # Name of the image we'll be running a container from
-  image: jedha/sample-mlflow-server
+  image: my-mlflow-image
   # Volume binding
   volumes: ["$(pwd):/home/app"]
   # Set environment variables
@@ -12,8 +12,8 @@ docker_env:
       "AWS_ACCESS_KEY_ID",
       "AWS_SECRET_ACCESS_KEY",
       "BACKEND_STORE_URI",
-      "ARTIFACT_ROOT"
-    ]
+      "ARTIFACT_ROOT"    
+      ]
     
 entry_points:
   main:
