@@ -48,11 +48,14 @@ Happy coding! 👩‍💻
 
 
 ##  lancement du train.py dans une image buildée sur my-mlflow-image
-
-
-
+### en local
 ```
 source secret/secrets.sh
 docker build ./docker mlflow-image
 mlflow run . --build-image --experiment-name california_housing_regressor_2
 ```
+
+### avec un projet github
+source secret/secrets.sh
+docker build ./docker mlflow-image
+mlflow run https://github.com/waaou/remote-mlflow-train.git --build-image --experiment-name california_housing_regressor_2
