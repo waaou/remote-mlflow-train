@@ -51,11 +51,11 @@ Happy coding! 👩‍💻
 ### en local
 ```
 source secret/secrets.sh
-docker build ./docker mlflow-image
+docker build ./docker my-mlflow-image
 mlflow run . --build-image --experiment-name california_housing_regressor_2
 ```
 
 ### avec un projet github
 source secret/secrets.sh
-docker build ./docker mlflow-image
+docker build ./docker my-mlflow-image
 mlflow run https://github.com/waaou/remote-mlflow-train.git --build-image --experiment-name california_housing_regressor_2
